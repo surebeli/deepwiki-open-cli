@@ -225,15 +225,43 @@ deepwiki-open (现状):                    deepwiki-cli (目标):
 - 包含 Rich 集成（通过 `typer[all]`）
 - 底层仍是 Click，兼容 Click 插件
 
-### 3.4 重新实现 vs Fork deepwiki-open
+### 3.4 与 deepwiki-open 的集成策略
 
-**决策**: 重新实现（vendor concepts, not code）。
+**决策**: Git Submodule（只读）+ 渐进式适配层。详见 [ADR-001](ADR-001-deepwiki-open-integration.md)。
 
-**原因**:
-- deepwiki-open 后端紧耦合 adalflow 框架（OllamaClient, OpenAIClient 等特有类型）
-- 紧耦合 FastAPI（路由定义散布于业务逻辑中）
-- 状态管理依赖 Web session，不适合 CLI
-- **保留的核心资产**: prompt 模板、文件过滤规则、Wiki 结构规划算法、RAG 检索策略
+**三个关键发现**（决定策略的前提）:
+- `prompts.py` 是纯字符串常量 — **零耦合**，可直接 `import`
+- `RAG` 类无 FastAPI 耦合 — 可独立调用 `rag = RAG(...); rag.call(query)`
+- `api/api.py`（路由层）和 7 个 provider client 无复用价值，被 litellm 替代
+
+**集成层次**:
+
+```
+vendor/deepwiki-open/        ← git submodule，只读，不修改任何文件
+├── api/prompts.py           ← Phase 1: 直接 import，立即同步 prompt 改进
+├── api/config/*.json        ← Phase 1: symlink，立即同步模型预设和过滤规则
+├── api/data_pipeline.py     ← Phase 3: 通过适配层调用（类型转换）
+└── api/rag.py               ← Phase 3: 通过适配层调用（RAG 算法）
+
+src/deepwiki/adapters/       ← 适配层，仅负责类型转换，不含业务逻辑
+├── upstream_rag.py          ← adalflow.Document ↔ deepwiki.Document
+└── upstream_data.py         ← 参数格式适配
+```
+
+**不复用的部分**:
+- `api/api.py` — FastAPI 路由层，被 deepwiki-cli 的 CLI 层替代
+- `api/openai_client.py` 等 7 个 provider client — 被 litellm 统一替代
+- adalflow 框架本身 — 作为 `[upstream]` 可选依赖，不强制要求
+
+**同步方式**:
+```bash
+git submodule update --remote vendor/deepwiki-open  # 拉取上游所有改进
+pytest tests/unit/test_adapters.py                  # 验证适配层契约未破坏
+```
+
+> **治理边界**：`vendor/deepwiki-open/` 是只读引用，任何情况下不得直接修改其中文件。
+> 若必须修改，优先顺序为：适配层 → 向上游提 PR → Fork 管理。
+> 详见 [ADR-001 §上游源码治理政策](ADR-001-deepwiki-open-integration.md)。
 
 ## 4. Data Models
 

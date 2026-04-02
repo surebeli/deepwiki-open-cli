@@ -40,6 +40,7 @@ deepwiki repl ./my-repo
 | [Architecture](docs/architecture/ARCHITECTURE.md) | Layer design, module responsibilities, design decisions |
 | [Data Flow](docs/architecture/DATA_FLOW.md) | Runtime data flow for each command, caching, streaming |
 | [Constraints](docs/architecture/CONSTRAINTS.md) | Technical/platform/network/performance boundaries |
+| [ADR-001: deepwiki-open Integration](docs/architecture/ADR-001-deepwiki-open-integration.md) | How to use upstream code via submodule without invasive changes |
 | [Implementation Plan](docs/PLAN.md) | Phased roadmap with deliverables and dependencies |
 
 ## License

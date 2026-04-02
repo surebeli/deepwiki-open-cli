@@ -371,6 +371,38 @@ class EmbeddingResponse:
 | `azure` | `azure/` | `azure/gpt-4o` | `AZURE_API_KEY` + `AZURE_API_BASE` |
 | `bedrock` | `bedrock/` | `bedrock/anthropic.claude-3-sonnet` | AWS credentials |
 | `openai-compat` | *(none)* | `qwen-plus` | `OPENAI_API_KEY` + `OPENAI_BASE_URL` |
+| `kimi` | *(none, openai-compat)* | `kimi-k2.5` | `OPENAI_API_KEY` + `OPENAI_BASE_URL=https://api.kimi.com/coding/v1` |
+| `glm` | *(none, openai-compat)* | `glm-4.7` | `OPENAI_API_KEY` + `OPENAI_BASE_URL=https://api.z.ai/api/paas/v4` |
+
+> **Kimi**: Moonshot AI 的编程专用端点，支持 kimi-k2 / kimi-k2.5（256K context，视觉理解）。
+> litellm 原生支持 `moonshot/` prefix，亦可用 `openai-compat` 通道。
+>
+> **GLM (Z.AI)**: 智谱 AI GLM 模型，提供两种接入模式（见下方 2.3a）：
+> - OpenAI-compat 模式: 直接指定 GLM 模型名
+> - Anthropic-compat 模式: 用 Claude 模型名，Z.AI 服务端做模型映射
+
+#### 2.3a GLM Anthropic-compat 模式 (特殊)
+
+Z.AI 提供 Anthropic 协议兼容端点，专为 Claude Code 等 Anthropic SDK 用户设计。
+在此模式下发送 Claude 模型名，Z.AI 服务端自动映射到 GLM 模型：
+
+| Claude Model (请求) | Z.AI 映射目标 |
+|--------------------|--------------|
+| `claude-opus-*` | `glm-4.7` |
+| `claude-sonnet-*` | `glm-4.7` |
+| `claude-haiku-*` | `glm-4.5-air` |
+
+配置方式（等效于 Claude Code 的 settings.json 配置）：
+```
+ANTHROPIC_API_KEY  = <z.ai_api_key>
+ANTHROPIC_BASE_URL = https://api.z.ai/api/anthropic
+# 中国区: https://open.bigmodel.cn/api/anthropic
+provider = anthropic
+model    = claude-sonnet-4-20250514   # Z.AI 服务端映射到 glm-4.7
+```
+
+> litellm 支持 `anthropic/` provider 传入自定义 `api_base`，此模式可直接通过
+> `LiteLLMProvider(provider="anthropic", api_base=ANTHROPIC_BASE_URL)` 实现。
 
 ### 2.4 Embedding Provider Mapping
 
@@ -520,11 +552,12 @@ log_level: INFO
 | `OPENAI_API_KEY` | `provider.api_key` | 当 provider=openai |
 | `GOOGLE_API_KEY` | `provider.api_key` | 当 provider=google |
 | `ANTHROPIC_API_KEY` | `provider.api_key` | 当 provider=anthropic |
+| `ANTHROPIC_BASE_URL` | `provider.api_base` | 当 provider=anthropic；用于 Z.AI GLM Anthropic-compat 模式、其他 Anthropic-compatible 代理 |
 | `OPENROUTER_API_KEY` | `provider.api_key` | 当 provider=openrouter |
 | `AZURE_API_KEY` | `provider.api_key` | 当 provider=azure |
 | `AZURE_API_BASE` | `provider.api_base` | 当 provider=azure |
 | `OLLAMA_HOST` | `provider.api_base` | 当 provider=ollama, default `http://localhost:11434` |
-| `OPENAI_BASE_URL` | `provider.api_base` | OpenAI 兼容端点 |
+| `OPENAI_BASE_URL` | `provider.api_base` | OpenAI 兼容端点；Kimi (`https://api.kimi.com/coding/v1`)、GLM OpenAI 模式 (`https://api.z.ai/api/paas/v4`)、Qwen 等 |
 
 ### 4.4 API Key Resolution Logic
 

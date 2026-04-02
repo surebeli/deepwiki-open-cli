@@ -62,19 +62,20 @@ PRD (What & Why)
 
 | # | File | Description | Depends On |
 |---|------|-------------|------------|
-| 1 | `pyproject.toml` | 包配置、依赖声明、entry_points | — |
+| 0 | `vendor/deepwiki-open/` (git submodule) | `git submodule add https://github.com/AsyncFuncAI/deepwiki-open`；**只读引用，不得修改 `vendor/` 内任何文件**；治理政策见 [ADR-001](architecture/ADR-001-deepwiki-open-integration.md) | — |
+| 1 | `pyproject.toml` | 包配置、依赖声明、entry_points；新增 `[upstream]` 可选依赖组 | — |
 | 2 | `src/deepwiki/__init__.py` | 包根、版本号 | — |
 | 3 | `src/deepwiki/__main__.py` | `python -m deepwiki` 入口 | 2 |
 | 4 | `src/deepwiki/config/defaults.py` | 内置默认配置值 | — |
 | 5 | `src/deepwiki/config/settings.py` | Pydantic 配置模型 + ConfigLoader (仅支持 Level 2 + Level 5) | 4 |
-| 6 | `src/deepwiki/config/generator.json` | LLM 模型预设 | — |
-| 7 | `src/deepwiki/config/embedder.json` | Embedding 模型预设 | — |
-| 8 | `src/deepwiki/config/repo.json` | 文件过滤规则 | — |
+| 6 | `src/deepwiki/config/generator.json` |  LLM 模型预设 symlink → `vendor/deepwiki-open/api/config/generator.json` | 0 |
+| 7 | `src/deepwiki/config/embedder.json` | Embedding 模型预设 symlink → `vendor/deepwiki-open/api/config/embedder.json` | 0 |
+| 8 | `src/deepwiki/config/repo.json` | 文件过滤规则 symlink → `vendor/deepwiki-open/api/config/repo.json` | 0 |
 | 9 | `src/deepwiki/providers/base.py` | BaseLLMProvider 抽象 + Request/Response dataclass | — |
 | 10 | `src/deepwiki/providers/litellm_provider.py` | litellm 统一实现 (complete + stream) | 9 |
 | 11 | `src/deepwiki/data/repo_manager.py` | 本地仓库解析 (无 clone，仅路径验证) | — |
 | 12 | `src/deepwiki/data/document_reader.py` | 文件遍历 + 读取 + Document 构建 | 8 |
-| 13 | `src/deepwiki/core/prompts.py` | Wiki 结构规划 + 页面生成的 prompt 模板 | — |
+| 13 | `src/deepwiki/core/prompts.py` | Wiki 结构规划 + 页面生成的 prompt 模板 从 `vendor/deepwiki-open/api/prompts.py` 直接 import + 补充 wiki-generate 专用模板 | 0 |
 | 14 | `src/deepwiki/core/wiki_generator.py` | 两阶段 Wiki 生成 (结构规划 + 内容生成) | 9, 12, 13 |
 | 15 | `src/deepwiki/output/formatter.py` | OutputFormatter 协议 + 工厂函数 | — |
 | 16 | `src/deepwiki/output/terminal.py` | Rich 终端渲染 | 15 |
@@ -160,7 +161,10 @@ deepwiki ask ./my-repo "Explain the data model"
 
 | # | File | Description | Depends On |
 |---|------|-------------|------------|
-| 30 | `src/deepwiki/agent/detector.py` | AgentDetector: 6 种 Agent 检测策略 | — |
+| 30 | `src/deepwiki/adapters/upstream_rag.py` | `UpstreamRAGAdapter`：将 `vendor/.../rag.py::RAG` 映射到 deepwiki-cli 接口；类型转换 adalflow.Document ↔ deepwiki.Document | 0 |
+| 30b | `src/deepwiki/adapters/upstream_data.py` | `data_pipeline.py` 函数适配层（参数格式 + 类型转换） | 0 |
+| 30c | `tests/unit/test_adapters.py` | 适配层契约测试（防止上游 API 变化静默破坏适配） | 30, 30b |
+| 31 | `src/deepwiki/agent/detector.py` | AgentDetector: 6 种 Agent 检测策略 | — |
 | 31 | `src/deepwiki/agent/protocol.py` | Agent JSON 通信协议定义 | — |
 | 32 | `src/deepwiki/agent/skill.py` | SKILL.md 生成辅助 | — |
 | 33 | `src/deepwiki/agent/proxy.py` | Agent 模型直通 Provider | 30, 10 |

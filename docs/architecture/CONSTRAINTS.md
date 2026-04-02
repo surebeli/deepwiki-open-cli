@@ -19,27 +19,51 @@
 
 | Constraint | Detail |
 |-----------|--------|
-| **litellm 为唯一 LLM 客户端** | 不维护独立的 OpenAI/Google/Ollama 等客户端。所有 LLM 调用通过 litellm 路由。如果 litellm 不支持某个 provider，则该 provider 不被支持 |
+| **litellm 为唯一 LLM 客户端** | 不维护独立的 OpenAI/Google/Ollama 等客户端。所有 LLM 调用通过 litellm 路由。如果 litellm 不支持某个 provider，则该 provider 不被支持。对于 OpenAI-compat 端点（Kimi、GLM OpenAI 模式、Qwen 等），通过 `OPENAI_BASE_URL` 覆盖接入。对于 Anthropic-compat 端点（Z.AI GLM、其他 Claude 代理），通过 `ANTHROPIC_BASE_URL` 覆盖接入 |
 | **不依赖 adalflow** | deepwiki-open 使用 adalflow 框架，但其与 deepwiki-cli 的架构不兼容（OllamaClient、OpenAIClient 等专有类型），不引入 |
 | **不依赖浏览器引擎** | 不使用 Playwright/Puppeteer/Chromium。Mermaid 图表仅输出源代码，不渲染为图片（用户可通过外部工具渲染） |
 | **ChromaDB 为必须依赖** | 向量存储是核心功能，ChromaDB 是默认后端。FAISS 为可选 |
 | **无 C 编译依赖** | 所有 required dependencies 必须提供预编译 wheel，不要求用户本地有 C 编译器 |
 
-### 1.3 不 Fork deepwiki-open
+### 1.3 deepwiki-open 集成约束
 
-**决策**: 重新实现核心逻辑，不直接 fork 或 vendor deepwiki-open 代码。
+> 完整治理政策见 [ADR-001 §上游源码治理政策](ADR-001-deepwiki-open-integration.md)。以下为摘要。
 
-**原因**:
-1. adalflow 框架耦合 — 其 `Generator`、`Embedder`、`Retriever` 类型与我们的抽象层冲突
-2. FastAPI 路由耦合 — 业务逻辑散布在 HTTP handler 中
-3. Web session 状态 — 聊天历史依赖 Web session，不适合 CLI
-4. 7 个独立 provider 客户端 — 被 litellm 单一抽象替代
+**核心立场**:
 
-**保留复用的资产** (以概念/逻辑层面复用，不复制代码):
-- Prompt 模板设计思路 (wiki 结构规划、页面生成、RAG 问答)
-- 文件过滤规则 (repo.json 中的扩展名列表、排除目录)
-- 文本分块策略 (word-based, 350 token chunk, 100 overlap)
-- Wiki 结构规划的两阶段方法 (先规划结构，再逐页生成)
+| 场景 | 策略 | 原因 |
+|------|------|------|
+| 默认 | `vendor/deepwiki-open/` 只读引用（git submodule） | 保持 `git submodule update` 同步能力 |
+| 需要 bug fix / 改进 | 优先通过适配层或向上游提 PR | 避免 patch 随上游迭代腐化 |
+| 无法通过适配层解决 | Fork 到自己组织并建立同步 CI | 最后手段，引入额外维护负担 |
+| 直接修改 `vendor/` 内文件 | **禁止**，无授权不得为之 | 破坏同步机制，积累技术债 |
+
+**侵入式修改的授权门槛**（必须同时满足）:
+1. 已穷举所有非侵入方案，均不可行
+2. 影响范围已在 Issue/PR 中记录
+3. 项目维护者已认可
+4. 有明确的上游回馈计划（优先贡献回 deepwiki-open）
+
+**决策**: 通过 git submodule 只读引用，不侵入修改 deepwiki-open 任何文件。详见 [ADR-001](ADR-001-deepwiki-open-integration.md)。
+
+**不可复用的部分**（不引入）:
+1. `api/api.py` FastAPI 路由 — 被 CLI 层替代，不可移植
+2. 7 个 provider client — 被 litellm 单一抽象替代
+3. adalflow 框架 — 作为**可选依赖**（`pip install deepwiki-cli[upstream]`），不作为必须依赖
+
+**可直接复用的部分**（零修改 import）:
+- `api/prompts.py` — 纯字符串模板，直接 import，随 submodule update 同步
+- `api/config/*.json` — 纯配置文件，symlink 或构建时复制
+
+**通过适配层复用的部分**（Phase 3+）:
+- `api/rag.py::RAG` — 无 FastAPI 耦合，可独立实例化
+- `api/data_pipeline.py` — 纯函数为主，类型转换后可用
+
+**同步策略**:
+```bash
+# 随时可执行，不需要任何代码修改
+git submodule update --remote vendor/deepwiki-open
+```
 
 ---
 
