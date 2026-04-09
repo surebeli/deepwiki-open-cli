@@ -1,0 +1,3 @@
+[submodule "vendor/deepwiki-open"]
+	path = vendor/deepwiki-open
+	url = https://github.com/AsyncFuncAI/deepwiki-open

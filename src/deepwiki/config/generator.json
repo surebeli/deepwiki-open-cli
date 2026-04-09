@@ -1,0 +1,32 @@
+{
+  "providers": [
+    {
+      "name": "openai",
+      "models": ["gpt-4o-mini", "gpt-4o", "o4-mini"]
+    },
+    {
+      "name": "anthropic",
+      "models": ["claude-3-5-sonnet", "claude-3-7-sonnet", "claude-3-opus"]
+    },
+    {
+      "name": "google",
+      "models": ["gemini-2.0-flash", "gemini-2.5-pro", "gemini-2.5-flash"]
+    },
+    {
+      "name": "ollama",
+      "models": ["ollama/qwen3:8b", "ollama/qwen3.5:9b", "ollama/llama3.1:8b"]
+    },
+    {
+      "name": "openrouter",
+      "models": ["openrouter/anthropic/claude-3.5-sonnet", "openrouter/openai/gpt-4o-mini"]
+    },
+    {
+      "name": "azure",
+      "models": ["azure/gpt-4o-mini", "azure/gpt-4o"]
+    },
+    {
+      "name": "bedrock",
+      "models": ["bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0"]
+    }
+  ]
+}

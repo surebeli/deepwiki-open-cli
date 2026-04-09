@@ -1,6 +1,6 @@
 # DeepWiki CLI - Implementation Plan
 
-> Version: 0.1.0 | Status: Draft | Updated: 2026-04-02
+> Version: 0.2.9 | Status: In Progress | Updated: 2026-04-07
 
 ---
 
@@ -256,6 +256,7 @@ docker-compose up
 | 60 | `.github/workflows/release.yml` | PyPI 自动发布流水线 |
 | 61 | 提交 CLI-Anything registry | registry.json PR |
 | 62 | Claude Code plugin config | `.claude/` 配置 |
+| 63 | `scripts/verify_post_release.ps1` | 发布后安装验收脚本（PyPI/wheel） |
 
 ---
 
