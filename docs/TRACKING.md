@@ -267,3 +267,4 @@
   - 已完成：新增验收脚本 `scripts/verify_post_release.ps1`，支持 `-Mode pypi|wheel`。
   - 已验证：`python -m deepwiki --help`、`python -m deepwiki version`、`python -m deepwiki generate <repo> --offline` 在安装环境可运行。
   - 已更新：版本号提升到 `0.2.9`（代码、包元数据、PLAN、TECHNICAL_SPEC）。
+  - 已完成：将主仓库本地 `origin` 地址切换为 `https://github.com/surebeli/deepwiki-open-cli`，用于后续 GitHub 同步与提交。
