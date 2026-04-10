@@ -14,6 +14,7 @@ from deepwiki.core.models import WikiPage, WikiResult
 from deepwiki.core.wiki_generator import WikiGenerator
 from deepwiki.data.document_reader import read_repo_files
 from deepwiki.data.repo_manager import resolve_repo_path
+from deepwiki.output.safe_display import display_repo_ref
 
 
 def _slugify(value: str) -> str:
@@ -98,7 +99,7 @@ def register_export(app: typer.Typer) -> None:
             result = asyncio.run(generator.generate(repo_name=repo_path.name, files=files))
 
         metadata = {
-            "repo": str(repo_path),
+            "repo": display_repo_ref(repo_path),
             "language": language,
             "format": selected_format,
             "pages_generated": len(result.pages),

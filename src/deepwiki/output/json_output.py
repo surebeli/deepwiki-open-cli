@@ -6,6 +6,7 @@ from dataclasses import asdict
 
 from deepwiki.config.settings import ResolvedSettings
 from deepwiki.core.models import AskResult, ResearchResult
+from deepwiki.output.safe_display import display_project_root
 
 
 class JSONFormatter:
@@ -53,7 +54,7 @@ class JSONFormatter:
                 "sources": sources,
             },
             "metadata": {
-                "project_root": str(project_root.resolve()),
+                "project_root": display_project_root(project_root),
             },
         }
         print(json.dumps(payload, ensure_ascii=True))
@@ -82,7 +83,7 @@ class JSONFormatter:
                 "embedder": embedder_catalog,
             },
             "metadata": {
-                "project_root": str(project_root.resolve()),
+                "project_root": display_project_root(project_root),
             },
         }
         print(json.dumps(payload, ensure_ascii=True))

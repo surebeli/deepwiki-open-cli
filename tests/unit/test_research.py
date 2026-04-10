@@ -83,6 +83,7 @@ def test_research_command_json_and_plain_output(monkeypatch, tmp_path: Path) -> 
     assert payload["type"] == "research"
     assert payload["data"]["topic"] == "cache-strategy"
     assert len(payload["data"]["iterations"]) == 2
+    assert payload["metadata"]["repo"] == "repo"
     assert payload["metadata"]["iterations_completed"] == 2
     assert payload["metadata"]["index_cached"] is True
 

@@ -268,3 +268,6 @@
   - 已验证：`python -m deepwiki --help`、`python -m deepwiki version`、`python -m deepwiki generate <repo> --offline` 在安装环境可运行。
   - 已更新：版本号提升到 `0.2.9`（代码、包元数据、PLAN、TECHNICAL_SPEC）。
   - 已完成：将主仓库本地 `origin` 地址切换为 `https://github.com/surebeli/deepwiki-open-cli`，用于后续 GitHub 同步与提交。
+  - 已完成：主仓库安全收敛，移除 CLI / JSON / API 元数据中的绝对本机路径输出，改为仅暴露仓库名或脱敏后的配置路径。
+  - 已验证：新增安全显示测试与 API/研究输出断言，避免本地路径、用户名目录等信息出现在用户可见输出中。
+  - 已更新：版本号提升到 `0.2.10`（代码、包元数据、PLAN、TECHNICAL_SPEC）。

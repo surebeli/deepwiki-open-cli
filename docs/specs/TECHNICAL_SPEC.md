@@ -1,6 +1,6 @@
 # DeepWiki CLI - Technical Specification
 
-> Version: 0.2.9 | Status: In Progress | Updated: 2026-04-07
+> Version: 0.2.10 | Status: In Progress | Updated: 2026-04-07
 
 ---
 

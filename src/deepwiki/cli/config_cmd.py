@@ -10,6 +10,7 @@ from deepwiki.cli.callbacks import build_resolved_settings
 from deepwiki.config.providers_catalog import load_provider_catalogs
 from deepwiki.config.settings import project_config_path, user_config_path
 from deepwiki.output.json_output import JSONFormatter
+from deepwiki.output.safe_display import display_config_path, display_project_root
 
 _INT_FIELDS = {"top_k", "chunk_size", "chunk_overlap"}
 _SUPPORTED_FIELDS = (
@@ -116,7 +117,7 @@ def register_config(app: typer.Typer) -> None:
             formatter.render_config(resolved=resolved, project_root=project_root)
             return
 
-        typer.echo(f"Project Root: {project_root}")
+        typer.echo(f"Project Root: {display_project_root(project_root)}")
         for field in (
             "provider",
             "model",
@@ -154,7 +155,7 @@ def register_config(app: typer.Typer) -> None:
             )
             return
 
-        typer.echo(f"Project Root: {project_root}")
+        typer.echo(f"Project Root: {display_project_root(project_root)}")
         typer.echo("Generation Providers:")
         for provider_name, models in generator_catalog.items():
             suffix = " *" if provider_name == resolved.settings.provider else ""
@@ -211,20 +212,20 @@ def register_config(app: typer.Typer) -> None:
             "type": "config_set",
             "data": {
                 "scope": normalized_scope,
-                "path": str(target_path),
+                "path": display_config_path(target_path),
                 "key": normalized_key,
                 "written_value": payload[normalized_key],
                 "effective_value": effective_value,
             },
             "metadata": {
-                "project_root": str(project_root),
+                "project_root": display_project_root(project_root),
             },
         }
         if json_output:
             print(json.dumps(result, ensure_ascii=True))
             return
 
-        typer.echo(f"Updated {normalized_key} in {target_path}")
+        typer.echo(f"Updated {normalized_key} in {display_config_path(target_path)}")
         typer.echo(f"effective: {effective_value}")
 
     @config_app.command("init")
@@ -277,18 +278,18 @@ def register_config(app: typer.Typer) -> None:
             "type": "config_init",
             "data": {
                 "scope": normalized_scope,
-                "path": str(target_path),
+                "path": display_config_path(target_path),
                 "written_keys": list(_SUPPORTED_FIELDS),
             },
             "metadata": {
-                "project_root": str(project_root),
+                "project_root": display_project_root(project_root),
             },
         }
         if json_output:
             print(json.dumps(result, ensure_ascii=True))
             return
 
-        typer.echo(f"Initialized config at {target_path}")
+        typer.echo(f"Initialized config at {display_config_path(target_path)}")
 
     @config_app.command("path")
     def config_path(
@@ -302,9 +303,9 @@ def register_config(app: typer.Typer) -> None:
             "status": "success",
             "type": "config_path",
             "data": {
-                "user": str(user_path),
-                "project": str(project_path),
-                "project_root": str(project_root),
+                "user": display_config_path(user_path),
+                "project": display_config_path(project_path),
+                "project_root": display_project_root(project_root),
             },
             "metadata": {
                 "user_exists": user_path.exists(),
@@ -315,8 +316,8 @@ def register_config(app: typer.Typer) -> None:
             print(json.dumps(result, ensure_ascii=True))
             return
 
-        typer.echo(f"user: {user_path}")
-        typer.echo(f"project: {project_path}")
-        typer.echo(f"project_root: {project_root}")
+        typer.echo(f"user: {display_config_path(user_path)}")
+        typer.echo(f"project: {display_config_path(project_path)}")
+        typer.echo(f"project_root: {display_project_root(project_root)}")
 
     app.add_typer(config_app, name="config")

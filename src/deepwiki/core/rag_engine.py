@@ -8,6 +8,7 @@ from deepwiki.core.models import AnswerSource, AskResult
 from deepwiki.data.cache_manager import CacheManager
 from deepwiki.data.text_splitter import split_documents
 from deepwiki.data.vector_store import ChromaVectorStore, VectorDocument
+from deepwiki.output.safe_display import display_repo_ref
 from deepwiki.providers.base import BaseLLMProvider, CompletionRequest, EmbeddingRequest
 
 
@@ -174,7 +175,7 @@ class RAGEngine:
         )
 
         metadata = {
-            "repo": str(repo_path.resolve()),
+            "repo": display_repo_ref(repo_path),
             "question": question,
             "provider": settings.provider,
             "model": settings.model,

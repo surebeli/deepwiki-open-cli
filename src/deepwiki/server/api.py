@@ -17,6 +17,7 @@ from deepwiki.core.wiki_generator import WikiGenerator
 from deepwiki.data.document_reader import read_repo_files
 from deepwiki.data.repo_manager import resolve_repo_path
 from deepwiki.config.providers_catalog import load_provider_catalogs
+from deepwiki.output.safe_display import display_repo_ref
 
 
 class AskRequest(BaseModel):
@@ -117,7 +118,7 @@ def _dedupe_sources(results: list[AskResult]) -> list:
 
 
 def create_app(cors_origins: list[str] | None = None) -> FastAPI:
-    app = FastAPI(title="DeepWiki API", version="0.2.9")
+    app = FastAPI(title="DeepWiki API", version="0.2.10")
     if cors_origins:
         app.add_middleware(
             CORSMiddleware,
@@ -177,7 +178,7 @@ def create_app(cors_origins: list[str] | None = None) -> FastAPI:
                 "status": "success",
                 "type": "wiki",
                 "data": {"title": result.title, "pages": [asdict(page) for page in result.pages]},
-                "metadata": {"repo": str(repo_path.resolve()), "provider": settings.provider, "model": settings.model},
+                "metadata": {"repo": display_repo_ref(repo_path), "provider": settings.provider, "model": settings.model},
             }
         except Exception as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -275,7 +276,7 @@ def create_app(cors_origins: list[str] | None = None) -> FastAPI:
                 conclusion=findings_history[-1] if findings_history else "",
                 sources=_dedupe_sources(ask_results),
                 metadata={
-                    "repo": str(repo_path.resolve()),
+                    "repo": display_repo_ref(repo_path),
                     "iterations_completed": len(research_iterations),
                     "provider": settings.provider,
                     "model": settings.model,
