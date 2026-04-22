@@ -1,0 +1,29 @@
+src/deepwiki/providers/litellm_provider.py
+  e0db3d2ac2cf0a33 24-27,32,40-43,48,58-93
+src/deepwiki/core/rag_engine.py
+  e0db3d2ac2cf0a33 16,100,103,134,137
+test_embed.py
+  e0db3d2ac2cf0a33 1-15
+src/deepwiki/server/api.py
+  e0db3d2ac2cf0a33 15,27-28,41-47,131-138,144-338,408,413
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "1278d45f03973564684bb09467f49df1ee429e04",
+  "prompts": {
+    "e0db3d2ac2cf0a33": {
+      "agent_id": {
+        "tool": "gemini",
+        "id": "aee61f53-8971-48ff-be7c-1e5be22036c3",
+        "model": "gemini-3-flash-preview"
+      },
+      "human_author": "litianyi",
+      "messages": [],
+      "total_additions": 350,
+      "total_deletions": 88,
+      "accepted_lines": 282,
+      "overriden_lines": 0
+    }
+  }
+}
