@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from deepwiki.cli.callbacks import build_runtime
 from deepwiki.core.models import AskResult, ResearchIteration, ResearchResult, WikiPage, WikiResult
+from deepwiki.providers.base import CompletionRequest, EmbeddingRequest
 from deepwiki.core.rag_engine import RAGEngine
 from deepwiki.core.wiki_generator import WikiGenerator
 from deepwiki.data.document_reader import read_repo_files
@@ -23,7 +24,8 @@ from deepwiki.output.safe_display import display_repo_ref
 class AskRequest(BaseModel):
     repo: str | None = None
     repo_url: str | None = None
-    question: str
+    question: str | None = None
+    messages: list[dict[str, str]] | None = None
     token: str | None = None
     repo_type: str | None = None
     provider: str | None = None
@@ -35,6 +37,13 @@ class AskRequest(BaseModel):
     chunk_overlap: int | None = None
     cache_dir: str | None = None
     no_cache: bool = False
+
+def _extract_question(request: AskRequest) -> str:
+    if request.question:
+        return request.question
+    if request.messages and len(request.messages) > 0:
+        return request.messages[-1].get("content", "")
+    return ""
 
 
 class GenerateRequest(BaseModel):
@@ -119,18 +128,213 @@ def _dedupe_sources(results: list[AskResult]) -> list:
 
 def create_app(cors_origins: list[str] | None = None) -> FastAPI:
     app = FastAPI(title="DeepWiki API", version="0.2.10")
-    if cors_origins:
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=cors_origins,
-            allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
+    
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"], # Allow all origins for local dev
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     @app.get("/health")
     def health() -> dict[str, object]:
         return {"status": "success", "type": "health", "data": {"ok": True}, "metadata": {}}
+
+    @app.get("/auth/status")
+    @app.get("/api/auth/status")
+    def auth_status() -> dict[str, object]:
+        return {
+            "status": "success",
+            "success": True,
+            "auth_required": False
+        }
+
+    @app.post("/auth/validate")
+    @app.post("/api/auth/validate")
+    def auth_validate() -> dict[str, object]:
+        return {
+            "status": "success",
+            "success": True,
+            "valid": True
+        }
+
+    @app.get("/models/config")
+    @app.get("/api/models/config")
+    def models_config_endpoint() -> dict[str, object]:
+        return models_config()
+
+    @app.get("/lang/config")
+    def lang_config() -> dict[str, object]:
+        return {
+            "status": "success",
+            "default": "en",
+            "supported_languages": {
+                "en": "English",
+                "ja": "Japanese (日本語)",
+                "zh": "Mandarin Chinese (中文)",
+                "zh-tw": "Traditional Chinese (繁體中文)",
+                "es": "Spanish (Español)",
+                "kr": "Korean (한국어)",
+                "vi": "Vietnamese (Tiếng Việt)",
+                "pt-br": "Brazilian Portuguese (Português Brasileiro)",
+                "fr": "Français (French)",
+                "ru": "Русский (Russian)"
+            }
+        }
+
+    @app.get("/api/processed_projects")
+    def processed_projects() -> dict[str, object]:
+        return {"status": "success", "data": []}
+
+    @app.get("/models/config")
+    def models_config_root() -> dict[str, object]:
+        return models_config()
+
+    @app.get("/api/wiki_cache")
+    def get_wiki_cache(repo: str, language: str = "en") -> dict[str, object]:
+        try:
+            repo_path = resolve_repo_path(repo)
+            # Find generated wiki files in cache
+            settings, _ = build_runtime(project_root=repo_path)
+            from deepwiki.data.cache_manager import CacheManager
+            cache_manager = CacheManager(settings.cache_dir)
+            
+            # This is a bit simplified, but let's try to find a wiki result
+            # Ideally we'd have a specific metadata store for generated wikis
+            return {"status": "error", "message": "Cache lookup not fully implemented, please click Generate"}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc)}
+
+    @app.get("/local_repo/structure")
+    def local_repo_structure(path: str) -> dict[str, object]:
+        print(f"Fetching structure for local path: {path}")
+        try:
+            repo_path = Path(path).expanduser().resolve()
+            if not repo_path.exists() or not repo_path.is_dir():
+                return {"status": "error", "message": f"Directory not found: {path}"}
+            
+            from deepwiki.data.document_reader import read_repo_files
+            files = read_repo_files(repo_path, limit=500)
+            file_tree = "\n".join([f[0] for f in files])
+            
+            # Try to find README
+            readme = ""
+            for name in ["README.md", "README", "readme.md"]:
+                readme_path = repo_path / name
+                if readme_path.exists():
+                    readme = readme_path.read_text(encoding="utf-8", errors="ignore")
+                    break
+
+            return {
+                "status": "success",
+                "file_tree": file_tree,
+                "readme": readme,
+                "data": {
+                    "name": repo_path.name,
+                    "path": str(repo_path),
+                    "is_local": True
+                }
+            }
+        except Exception as exc:
+            print(f"Error in local_repo_structure: {exc}")
+            return {"status": "error", "message": str(exc)}
+
+    @app.post("/api/wiki_cache")
+    def create_wiki_cache(request: GenerateRequest) -> dict[str, object]:
+        # Alias for generate
+        return generate(request)
+
+    @app.get("/api/models/config")
+    def models_config() -> dict[str, object]:
+        generator_catalog, _ = load_provider_catalogs()
+        providers = []
+        for p_id, models in generator_catalog.items():
+            providers.append({
+                "id": p_id,
+                "name": p_id.capitalize(),
+                "models": [{"id": m, "name": m} for m in models],
+                "supportsCustomModel": True
+            })
+        
+        return {
+            "providers": providers,
+            "defaultProvider": "ollama" if "ollama" in generator_catalog else (providers[0]["id"] if providers else "")
+        }
+
+    @app.post("/api/chat/stream")
+    async def chat_stream_api(request: AskRequest):
+        from fastapi.responses import StreamingResponse
+        return await chat_stream_internal(request)
+
+    @app.post("/chat/completions/stream")
+    async def chat_stream_completions(request: AskRequest):
+        return await chat_stream_internal(request)
+
+    async def chat_stream_internal(request: AskRequest):
+        from fastapi.responses import StreamingResponse
+        try:
+            repo_input = _resolve_repo_input(request.repo, request.repo_url)
+            repo_path = resolve_repo_path(repo_input, token=request.token, repo_type=request.repo_type)
+            settings, runtime_provider = build_runtime(
+                provider=request.provider,
+                model=request.model,
+                project_root=repo_path,
+            )
+            
+            question = _extract_question(request)
+            async def event_generator():
+                async for chunk in runtime_provider.stream(
+                    CompletionRequest(
+                        prompt=question,
+                        model=settings.model,
+                        provider=settings.provider,
+                    )
+                ):
+                    yield chunk
+
+            return StreamingResponse(event_generator(), media_type="text/event-stream")
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    from fastapi import WebSocket, WebSocketDisconnect
+    @app.websocket("/ws/chat")
+    async def websocket_chat(websocket: WebSocket):
+        await websocket.accept()
+        try:
+            while True:
+                data = await websocket.receive_json()
+                request = AskRequest(**data)
+                
+                repo_input = _resolve_repo_input(request.repo, request.repo_url)
+                repo_path = resolve_repo_path(repo_input, token=request.token, repo_type=request.repo_type)
+                settings, runtime_provider = build_runtime(
+                    provider=request.provider,
+                    model=request.model,
+                    project_root=repo_path,
+                )
+                
+                question = _extract_question(request)
+                async for chunk in runtime_provider.stream(
+                    CompletionRequest(
+                        prompt=question,
+                        model=settings.model,
+                        provider=settings.provider,
+                    )
+                ):
+                    await websocket.send_text(chunk)
+                
+                await websocket.close()
+                break
+        except WebSocketDisconnect:
+            pass
+        except Exception as exc:
+            print(f"WebSocket error: {exc}")
+            try:
+                await websocket.send_text(f"Error: {exc}")
+                await websocket.close()
+            except:
+                pass
 
     @app.get("/api/providers")
     def providers() -> dict[str, object]:
@@ -201,11 +405,12 @@ def create_app(cors_origins: list[str] | None = None) -> FastAPI:
             )
             files = read_repo_files(repo_path, limit=500)
             engine = RAGEngine(provider=runtime_provider)
+            question = _extract_question(request)
             result = asyncio.run(
                 engine.answer(
                     repo_path=repo_path,
                     files=files,
-                    question=request.question,
+                    question=question,
                     settings=settings,
                     top_k=request.top_k,
                     use_cache=not request.no_cache,
