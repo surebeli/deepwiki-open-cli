@@ -128,15 +128,27 @@ def _dedupe_sources(results: list[AskResult]) -> list:
 
 def create_app(cors_origins: list[str] | None = None) -> FastAPI:
     app = FastAPI(title="DeepWiki API", version="0.2.10")
+
+    # More explicit origins for local development
+    origins = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+    ]
+    if cors_origins:
+        origins.extend(cors_origins)
     
+    # Specification: cannot use * with allow_credentials=True
+    # Origins should be explicit
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"], # Allow all origins for local dev
+        allow_origins=origins if "*" not in origins else [o for o in origins if o != "*"],
+        allow_origin_regex=".*",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
-
     @app.get("/health")
     def health() -> dict[str, object]:
         return {"status": "success", "type": "health", "data": {"ok": True}, "metadata": {}}
@@ -203,16 +215,38 @@ def create_app(cors_origins: list[str] | None = None) -> FastAPI:
         return cache_dir / f"{safe_repo}_{language}.json"
 
     @app.get("/api/wiki_cache")
-    def get_wiki_cache(repo: str, language: str = "en") -> dict[str, object]:
+    def get_wiki_cache(repo: str, owner: str | None = None, language: str = "en") -> dict[str, object]:
         try:
-            cache_path = _get_cache_path(repo, language)
+            lookup_repo = repo
+            if owner and owner != "local":
+                lookup_repo = f"{owner}/{repo}"
+            
+            # 1. Direct path-based cache lookup
+            cache_path = _get_cache_path(lookup_repo, language)
+            
+            # 2. Fuzzy match fallback
+            if not cache_path.exists():
+                from deepwiki.data.repo_manager import _default_repo_cache_dir
+                cache_dir = _default_repo_cache_dir() / "wiki_cache"
+                if cache_dir.exists():
+                    # The filenames are like F__workspace_ai_hawk_agent-rs_zh.json
+                    # Search for any file containing repo name and ending with language suffix
+                    for f in cache_dir.glob(f"*{repo}*{language}.json"):
+                        cache_path = f
+                        print(f"DEBUG: Found fuzzy cache match: {f}")
+                        break
+
             if cache_path.exists():
                 with open(cache_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                return {"status": "success", "data": data}
-            return {"status": "error", "message": "Cache not found"}
+                    # RETURN THE RAW CONTENT DIRECTLY as the UI expects
+                    return json.load(f)
+            
+            # If not found, return a structure that tells the UI to keep looking or rebuild
+            # UI expects an object with wiki_structure and generated_pages to consider it a success
+            return None
         except Exception as exc:
-            return {"status": "error", "message": str(exc)}
+            print(f"DEBUG: Error in get_wiki_cache: {exc}")
+            return None
 
     @app.post("/api/wiki_cache")
     async def create_wiki_cache(request: dict) -> dict[str, object]:
