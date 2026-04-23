@@ -191,18 +191,52 @@ def create_app(cors_origins: list[str] | None = None) -> FastAPI:
     def models_config_root() -> dict[str, object]:
         return models_config()
 
+    import json
+    import os
+    
+    def _get_cache_path(repo: str, language: str) -> Path:
+        from deepwiki.data.repo_manager import _default_repo_cache_dir
+        # Simple cache naming based on repo name and language
+        safe_repo = repo.replace("/", "_").replace("\\", "_").replace(":", "_")
+        cache_dir = _default_repo_cache_dir() / "wiki_cache"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        return cache_dir / f"{safe_repo}_{language}.json"
+
     @app.get("/api/wiki_cache")
     def get_wiki_cache(repo: str, language: str = "en") -> dict[str, object]:
         try:
-            repo_path = resolve_repo_path(repo)
-            # Find generated wiki files in cache
-            settings, _ = build_runtime(project_root=repo_path)
-            from deepwiki.data.cache_manager import CacheManager
-            cache_manager = CacheManager(settings.cache_dir)
+            cache_path = _get_cache_path(repo, language)
+            if cache_path.exists():
+                with open(cache_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                return {"status": "success", "data": data}
+            return {"status": "error", "message": "Cache not found"}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc)}
+
+    @app.post("/api/wiki_cache")
+    async def create_wiki_cache(request: dict) -> dict[str, object]:
+        try:
+            # The UI sends: repo, language, wiki_structure, generated_pages, provider, model
+            repo_info = request.get("repo", {})
+            repo = repo_info.get("localPath") or repo_info.get("repoUrl") or f"{repo_info.get('owner', '')}/{repo_info.get('repo', '')}"
+            language = request.get("language", "en")
             
-            # This is a bit simplified, but let's try to find a wiki result
-            # Ideally we'd have a specific metadata store for generated wikis
-            return {"status": "error", "message": "Cache lookup not fully implemented, please click Generate"}
+            cache_path = _get_cache_path(repo, language)
+            with open(cache_path, "w", encoding="utf-8") as f:
+                json.dump(request, f, ensure_ascii=False, indent=2)
+                
+            return {"status": "success", "message": "Cache saved successfully"}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc)}
+
+    @app.delete("/api/wiki_cache")
+    def delete_wiki_cache(repo: str, language: str = "en") -> dict[str, object]:
+        try:
+            cache_path = _get_cache_path(repo, language)
+            if cache_path.exists():
+                cache_path.unlink()
+            return {"status": "success"}
         except Exception as exc:
             return {"status": "error", "message": str(exc)}
 
@@ -240,11 +274,6 @@ def create_app(cors_origins: list[str] | None = None) -> FastAPI:
             print(f"Error in local_repo_structure: {exc}")
             return {"status": "error", "message": str(exc)}
 
-    @app.post("/api/wiki_cache")
-    def create_wiki_cache(request: GenerateRequest) -> dict[str, object]:
-        # Alias for generate
-        return generate(request)
-
     @app.get("/api/models/config")
     def models_config() -> dict[str, object]:
         generator_catalog, _ = load_provider_catalogs()
@@ -273,9 +302,15 @@ def create_app(cors_origins: list[str] | None = None) -> FastAPI:
 
     async def chat_stream_internal(request: AskRequest):
         from fastapi.responses import StreamingResponse
+        import re
         try:
             repo_input = _resolve_repo_input(request.repo, request.repo_url)
+            # Clean path from quotes or extra spaces
+            repo_input = repo_input.strip().strip('"').strip("'")
             repo_path = resolve_repo_path(repo_input, token=request.token, repo_type=request.repo_type)
+            
+            print(f"DEBUG: Resolved repo_path for analysis: {repo_path}")
+            
             settings, runtime_provider = build_runtime(
                 provider=request.provider,
                 model=request.model,
@@ -283,6 +318,95 @@ def create_app(cors_origins: list[str] | None = None) -> FastAPI:
             )
             
             question = _extract_question(request)
+            
+            # Inject context
+            if "CRITICAL STARTING INSTRUCTION:" in question:
+                # Wiki page generation: inject explicitly listed files
+                file_contents = ""
+                # Robust regex for both: - [path](url) and - [path](path)
+                matches = re.findall(r'-\s+\[([^\]]+)\]\(([^)]+)\)', question)
+                # If that fails, try simpler one for just the bracketed part
+                if not matches:
+                    matches = [(m, m) for m in re.findall(r'-\s+\[([^\]]+)\]', question)]
+                
+                print(f"DEBUG: Found {len(matches)} potential files in prompt for injection.")
+                
+                injected_files = []
+                # Pre-list all files for fuzzy matching
+                all_repo_files = {str(p.relative_to(repo_path)).replace("\\", "/").lower(): p for p in repo_path.rglob("*") if p.is_file()}
+                
+                for file_path, _ in matches:
+                    # Clean the path and normalize slashes
+                    clean_path = file_path.strip().replace("\\", "/").lower()
+                    
+                    # 1. Try direct match
+                    full_path = repo_path / file_path.strip()
+                    target_p = None
+                    if full_path.exists() and full_path.is_file():
+                        target_p = full_path
+                    # 2. Try normalized match in pre-listed files
+                    elif clean_path in all_repo_files:
+                        target_p = all_repo_files[clean_path]
+                    # 3. Try partial match (e.g. "Cargo.toml" matches "crates/core/Cargo.toml")
+                    else:
+                        for rel_p_str, p in all_repo_files.items():
+                            if rel_p_str.endswith("/" + clean_path) or rel_p_str == clean_path:
+                                target_p = p
+                                break
+                    
+                    if target_p:
+                        try:
+                            content = target_p.read_text(encoding='utf-8', errors='ignore')
+                            display_name = str(target_p.relative_to(repo_path))
+                            file_contents += f"\n\n--- FILE: {display_name} ---\n{content}\n"
+                            injected_files.append(display_name)
+                        except Exception as e:
+                            print(f"DEBUG: Failed to read {target_p}: {e}")
+                    else:
+                        print(f"DEBUG: File NOT found in repo: {file_path}")
+
+                if file_contents:
+                    print(f"DEBUG: Successfully injected {len(injected_files)} files ({len(file_contents)} chars): {', '.join(injected_files)}")
+                    question += f"\n\n[REAL SOURCE CODE CONTEXT]\nBelow is the actual content of the files you are asked to use. Base your wiki ONLY on this content:\n{file_contents}"
+                else:
+                    print("DEBUG: WARNING - No file contents were injected into the prompt!")
+            elif "Analyze this GitHub repository" not in question:
+                # Regular chat: perform RAG retrieval if index exists
+                try:
+                    from deepwiki.data.cache_manager import CacheManager
+                    from deepwiki.data.vector_store import ChromaVectorStore
+                    from deepwiki.providers.base import EmbeddingRequest
+                    
+                    files = read_repo_files(repo_path, limit=500)
+                    cache_manager = CacheManager(settings.cache_dir)
+                    cache_key = cache_manager.build_cache_key(
+                        repo_path=repo_path,
+                        files=files,
+                        embed_provider=settings.embed_provider,
+                        embed_model=settings.embed_model,
+                        chunk_size=settings.chunk_size,
+                        chunk_overlap=settings.chunk_overlap,
+                    )
+                    index_path = cache_manager.index_path(cache_key)
+                    store = ChromaVectorStore(str(index_path))
+                    
+                    if store.load(str(index_path)):
+                        question_embedding = await runtime_provider.embed(
+                            EmbeddingRequest(
+                                texts=[question],
+                                model=settings.embed_model,
+                                provider=settings.embed_provider,
+                            )
+                        )
+                        if question_embedding.embeddings:
+                            retrieved = store.query(embedding=question_embedding.embeddings[0], top_k=settings.top_k)
+                            context_blocks = [f"[{res.metadata.get('file_path', '?')}]\n{res.text}" for res in retrieved]
+                            if context_blocks:
+                                context_text = "\n\n".join(context_blocks)
+                                question = f"Context:\n{context_text}\n\nQuestion:\n{question}"
+                except Exception as e:
+                    print(f"RAG retrieval failed in chat stream: {e}")
+            
             async def event_generator():
                 async for chunk in runtime_provider.stream(
                     CompletionRequest(
@@ -300,6 +424,7 @@ def create_app(cors_origins: list[str] | None = None) -> FastAPI:
     from fastapi import WebSocket, WebSocketDisconnect
     @app.websocket("/ws/chat")
     async def websocket_chat(websocket: WebSocket):
+        import re
         await websocket.accept()
         try:
             while True:
@@ -315,6 +440,83 @@ def create_app(cors_origins: list[str] | None = None) -> FastAPI:
                 )
                 
                 question = _extract_question(request)
+                
+                # Inject context
+                if "CRITICAL STARTING INSTRUCTION:" in question:
+                    file_contents = ""
+                    matches = re.findall(r'-\s+\[([^\]]+)\]\(([^)]+)\)', question)
+                    if not matches:
+                        matches = [(m, m) for m in re.findall(r'-\s+\[([^\]]+)\]', question)]
+                    
+                    injected_files = []
+                    # Pre-list all files for fuzzy matching
+                    all_repo_files = {str(p.relative_to(repo_path)).replace("\\", "/").lower(): p for p in repo_path.rglob("*") if p.is_file()}
+                    
+                    for file_path, _ in matches:
+                        clean_path = file_path.strip().replace("\\", "/").lower()
+                        # 1. Try direct match
+                        full_path = repo_path / file_path.strip()
+                        target_p = None
+                        if full_path.exists() and full_path.is_file():
+                            target_p = full_path
+                        # 2. Try normalized match
+                        elif clean_path in all_repo_files:
+                            target_p = all_repo_files[clean_path]
+                        # 3. Try partial match
+                        else:
+                            for rel_p_str, p in all_repo_files.items():
+                                if rel_p_str.endswith("/" + clean_path) or rel_p_str == clean_path:
+                                    target_p = p
+                                    break
+                        
+                        if target_p:
+                            try:
+                                content = target_p.read_text(encoding='utf-8', errors='ignore')
+                                display_name = str(target_p.relative_to(repo_path))
+                                file_contents += f"\n\n--- FILE: {display_name} ---\n{content}\n"
+                                injected_files.append(display_name)
+                            except Exception as e:
+                                print(f"DEBUG: WS failed to read {target_p}: {e}")
+                    
+                    if file_contents:
+                        print(f"DEBUG: WS Successfully injected {len(injected_files)} files.")
+                        question += f"\n\n[REAL SOURCE CODE CONTEXT]\nBelow is the actual content of the files you are asked to use. Base your wiki ONLY on this content:\n{file_contents}"
+                elif "Analyze this GitHub repository" not in question:
+                    try:
+                        from deepwiki.data.cache_manager import CacheManager
+                        from deepwiki.data.vector_store import ChromaVectorStore
+                        from deepwiki.providers.base import EmbeddingRequest
+                        
+                        files = read_repo_files(repo_path, limit=500)
+                        cache_manager = CacheManager(settings.cache_dir)
+                        cache_key = cache_manager.build_cache_key(
+                            repo_path=repo_path,
+                            files=files,
+                            embed_provider=settings.embed_provider,
+                            embed_model=settings.embed_model,
+                            chunk_size=settings.chunk_size,
+                            chunk_overlap=settings.chunk_overlap,
+                        )
+                        index_path = cache_manager.index_path(cache_key)
+                        store = ChromaVectorStore(str(index_path))
+                        
+                        if store.load(str(index_path)):
+                            question_embedding = await runtime_provider.embed(
+                                EmbeddingRequest(
+                                    texts=[question],
+                                    model=settings.embed_model,
+                                    provider=settings.embed_provider,
+                                )
+                            )
+                            if question_embedding.embeddings:
+                                retrieved = store.query(embedding=question_embedding.embeddings[0], top_k=settings.top_k)
+                                context_blocks = [f"[{res.metadata.get('file_path', '?')}]\n{res.text}" for res in retrieved]
+                                if context_blocks:
+                                    context_text = "\n\n".join(context_blocks)
+                                    question = f"Context:\n{context_text}\n\nQuestion:\n{question}"
+                    except Exception as e:
+                        print(f"RAG retrieval failed in websocket: {e}")
+
                 async for chunk in runtime_provider.stream(
                     CompletionRequest(
                         prompt=question,

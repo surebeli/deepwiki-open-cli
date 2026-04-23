@@ -13,7 +13,7 @@ from deepwiki.providers.base import BaseLLMProvider, CompletionRequest, Embeddin
 
 
 class RAGEngine:
-    def __init__(self, provider: BaseLLMProvider, embedding_batch_size: int = 16):
+    def __init__(self, provider: BaseLLMProvider, embedding_batch_size: int = 500):
         self.provider = provider
         self.embedding_batch_size = embedding_batch_size
 
@@ -97,10 +97,9 @@ class RAGEngine:
         store.clear()
         for offset in range(0, len(chunks), self.embedding_batch_size):
             batch = chunks[offset : offset + self.embedding_batch_size]
-            texts = [chunk.text if (chunk.text and chunk.text.strip()) else "(empty)" for chunk in batch]
             embedding_response = await self.provider.embed(
                 EmbeddingRequest(
-                    texts=texts,
+                    texts=[chunk.text for chunk in batch],
                     model=settings.embed_model,
                     provider=settings.embed_provider,
                 )
@@ -131,10 +130,9 @@ class RAGEngine:
         index_cached: bool,
         started: float,
     ) -> AskResult:
-        question_text = question if (question and question.strip()) else "(empty)"
         question_embedding = await self.provider.embed(
             EmbeddingRequest(
-                texts=[question_text],
+                texts=[question],
                 model=settings.embed_model,
                 provider=settings.embed_provider,
             )
