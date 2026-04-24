@@ -1,0 +1,25 @@
+src/deepwiki/server/api.py
+  17ac77582e8dce64 209,218,252,268,278,312,329,334,337,460
+src/deepwiki/providers/litellm_provider.py
+  17ac77582e8dce64 14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "7b3c38dd6c1bd2dc86a54b1db303b1240469f2aa",
+  "prompts": {
+    "17ac77582e8dce64": {
+      "agent_id": {
+        "tool": "gemini",
+        "id": "02ab0098-4da6-49b3-beea-1baf1a3733cf",
+        "model": "unknown"
+      },
+      "human_author": "litianyi",
+      "messages": [],
+      "total_additions": 20,
+      "total_deletions": 226,
+      "accepted_lines": 743,
+      "overriden_lines": 0
+    }
+  }
+}
