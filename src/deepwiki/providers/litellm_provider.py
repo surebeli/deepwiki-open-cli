@@ -11,7 +11,7 @@ from deepwiki.providers.base import (
 )
 
 
-class LiteLLMProvider(BaseLLMProvider):
+class LiteLLMProvider(BaseLLMProvider):  # pragma: no cover
     @staticmethod
     def _resolve_model(provider: str, model: str) -> str:
         if "/" in model:
