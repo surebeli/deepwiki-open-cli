@@ -36,10 +36,11 @@ class LiteLLMProvider(BaseLLMProvider):
 
     async def stream(self, request: CompletionRequest) -> AsyncIterator[str]:
         from litellm import acompletion
+        import os
 
         kwargs = {}
         if request.provider == "ollama":
-            kwargs["api_base"] = "http://localhost:11434"
+            kwargs["api_base"] = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 
         stream = await acompletion(
             model=self._resolve_model(request.provider, request.model),
@@ -54,10 +55,11 @@ class LiteLLMProvider(BaseLLMProvider):
 
     async def embed(self, request: EmbeddingRequest) -> EmbeddingResponse:
         from litellm import aembedding
+        import os
 
         kwargs = {}
         if request.provider == "ollama":
-            kwargs["api_base"] = "http://localhost:11434"
+            kwargs["api_base"] = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 
         try:
             # Try batch embedding first

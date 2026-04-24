@@ -1,6 +1,7 @@
 # DeepWiki CLI - Technical Specification
 
 > Version: 0.2.10 | Status: In Progress | Updated: 2026-04-07
+> **CRITICAL ARCHITECTURE NOTE:** For all frontend-backend API routing, LLM interaction mappings, Context Injection logic, and Pure Linux deployment constraints, you MUST refer to the official [PROTOCOL_AND_LLM_INTERACTION.md](../architecture/PROTOCOL_AND_LLM_INTERACTION.md). Any backend modifications must strictly adhere to this protocol.
 
 ---
 

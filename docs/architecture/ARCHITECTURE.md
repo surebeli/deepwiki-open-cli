@@ -1,6 +1,7 @@
 # DeepWiki CLI - Architecture Document
 
 > Version: 0.1.0 | Status: Draft | Updated: 2026-04-01
+> **CRITICAL PROTOCOL NOTE:** The definitive source of truth for Frontend-Backend API routing, LLM Context Injection, and Linux Deployment Environment Variables is located in [PROTOCOL_AND_LLM_INTERACTION.md](PROTOCOL_AND_LLM_INTERACTION.md). Any structural changes MUST adhere to this protocol.
 
 ## 1. System Architecture Overview
 
