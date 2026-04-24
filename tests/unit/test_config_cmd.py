@@ -59,7 +59,8 @@ def test_config_path_and_set_json(monkeypatch, tmp_path: Path) -> None:
     assert result_path.exit_code == 0
     payload = json.loads(result_path.stdout.strip())
     assert payload["type"] == "config_path"
-    assert payload["data"]["project"].endswith(".deepwiki\\config.yaml")
+    # Cross-platform path check
+    assert payload["data"]["project"].replace("\\", "/").endswith(".deepwiki/config.yaml")
 
     result_set = runner.invoke(app, ["config", "set", "top_k", "12", str(repo), "--scope", "project", "--json"])
     assert result_set.exit_code == 0

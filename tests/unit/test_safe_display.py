@@ -19,5 +19,5 @@ def test_display_config_path_redacts_absolute_location(tmp_path: Path) -> None:
     user_cfg = tmp_path / "user-config.yaml"
     user_cfg.write_text("", encoding="utf-8")
 
-    assert display_config_path(project_cfg).endswith(".deepwiki\\config.yaml")
+    assert display_config_path(project_cfg).replace("\\", "/").endswith(".deepwiki/config.yaml")
     assert display_config_path(user_cfg) == "user-config.yaml"
