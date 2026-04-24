@@ -27,6 +27,10 @@
     {
       "name": "bedrock",
       "models": ["bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0"]
+    },
+    {
+      "name": "kimi-coding",
+      "models": ["k2p5", "k2p6", "kimi-code"]
     }
   ]
 }

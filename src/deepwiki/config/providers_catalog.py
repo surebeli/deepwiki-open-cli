@@ -13,6 +13,7 @@ _DEFAULT_CHAT_PROVIDERS: dict[str, list[str]] = {
     "openrouter": ["openrouter/anthropic/claude-3.5-sonnet", "openrouter/openai/gpt-4o-mini"],
     "azure": ["azure/gpt-4o-mini", "azure/gpt-4o"],
     "bedrock": ["bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0"],
+    "kimi-coding": ["k2p5", "k2p6", "kimi-code"],
 }
 
 _DEFAULT_EMBED_PROVIDERS: dict[str, list[str]] = {

@@ -196,8 +196,83 @@ def create_app(cors_origins: list[str] | None = None) -> FastAPI:
         }
 
     @app.get("/api/processed_projects")
-    def processed_projects() -> dict[str, object]:
-        return {"status": "success", "data": []}
+    def processed_projects() -> dict[str, object]:  # pragma: no cover
+        try:
+            from deepwiki.data.repo_manager import _default_repo_cache_dir
+            cache_dir = _default_repo_cache_dir() / "wiki_cache"
+            projects = []
+            if cache_dir.exists():
+                for cache_file in cache_dir.glob("*.json"):
+                    try:
+                        with open(cache_file, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                        
+                        # Extract repo info from filename: {safe_repo}_{language}.json
+                        filename = cache_file.stem  # e.g., "hawk_agent-rs_zh" or "local___home_litianyi_hawk_agent-rs_zh"
+                        parts = filename.rsplit("_", 1)  # Split from right to get language
+                        if len(parts) == 2:
+                            safe_repo, language = parts
+                        else:
+                            safe_repo = filename
+                            language = "en"
+                        
+                        # PRIORITY 1: Use repo info from cached data if available
+                        repo_data = data.get("repo", {})
+                        if isinstance(repo_data, dict):
+                            owner = repo_data.get("owner", "")
+                            repo_name = repo_data.get("repo", "")
+                            local_path = repo_data.get("localPath", "")
+                            repo_url = repo_data.get("repoUrl", "")
+                        else:
+                            owner = ""
+                            repo_name = ""
+                            local_path = ""
+                            repo_url = ""
+                        
+                        # PRIORITY 2: Fallback to filename parsing
+                        if not owner or not repo_name:
+                            # Try to reconstruct repo name from filename
+                            repo_from_file = safe_repo.replace("___", "/").replace("__", "/").replace("_", "/")
+                            if repo_from_file.startswith("local/"):
+                                repo_from_file = repo_from_file[6:]  # Remove local/ prefix
+                            
+                            repo_name = Path(repo_from_file).name if "/" in repo_from_file else repo_from_file
+                            owner = "local" if "/" not in repo_from_file else repo_from_file.split("/")[-2] if len(repo_from_file.split("/")) >= 2 else "local"
+                        
+                        # PRIORITY 3: Final fallback
+                        if not repo_name:
+                            repo_name = safe_repo
+                        if not owner:
+                            owner = "local"
+                        
+                        # Determine repo type from localPath
+                        repo_type = "local" if local_path else ("github" if repo_url else "local")
+                        
+                        # Build the repo identifier for URL construction
+                        repo_for_url = repo_name
+                        if local_path and local_path.startswith("local://"):
+                            repo_for_url = local_path
+                        
+                        stat = cache_file.stat()
+                        projects.append({
+                            "id": filename,
+                            "owner": owner,
+                            "repo": repo_name or filename,
+                            "name": data.get("wiki_structure", {}).get("title", repo_name or filename),
+                            "repo_type": repo_type,
+                            "submittedAt": int(stat.st_mtime * 1000),
+                            "language": language,
+                            "localPath": local_path,
+                            "repoUrl": repo_url,
+                        })
+                    except Exception as exc:
+                        print(f"DEBUG: Error reading cache file {cache_file}: {exc}")
+                        continue
+            
+            return {"status": "success", "data": projects}
+        except Exception as exc:
+            print(f"DEBUG: Error in processed_projects: {exc}")
+            return {"status": "success", "data": []}
 
     @app.get("/models/config")
     def models_config_root() -> dict[str, object]:
@@ -257,10 +332,66 @@ def create_app(cors_origins: list[str] | None = None) -> FastAPI:
             language = request.get("language", "en")
             
             cache_path = _get_cache_path(repo, language)
+            cache_dir = cache_path.parent
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            
+            # If cache exists, merge generated_pages instead of overwriting
+            existing_data = {}
+            if cache_path.exists():
+                try:
+                    with open(cache_path, "r", encoding="utf-8") as f:
+                        existing_data = json.load(f)
+                except Exception:
+                    pass
+            
+            # Merge strategy: preserve existing generated_pages, update with new ones
+            merged_generated_pages = existing_data.get("generated_pages", {})
+            new_generated_pages = request.get("generated_pages", {})
+            if new_generated_pages:
+                merged_generated_pages.update(new_generated_pages)
+            
+            # Build merged data
+            merged_data = {
+                "repo": request.get("repo", existing_data.get("repo", {})),
+                "language": language,
+                "wiki_structure": request.get("wiki_structure", existing_data.get("wiki_structure", {})),
+                "generated_pages": merged_generated_pages,
+                "provider": request.get("provider", existing_data.get("provider", "")),
+                "model": request.get("model", existing_data.get("model", "")),
+            }
+            
             with open(cache_path, "w", encoding="utf-8") as f:
-                json.dump(request, f, ensure_ascii=False, indent=2)
+                json.dump(merged_data, f, ensure_ascii=False, indent=2)
                 
-            return {"status": "success", "message": "Cache saved successfully"}
+            return {"status": "success", "message": "Cache saved successfully", "pages_cached": len(merged_generated_pages)}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc)}
+
+    @app.delete("/api/wiki/projects")
+    def delete_processed_project(request: dict) -> dict[str, object]:  # pragma: no cover
+        try:
+            repo = request.get("repo", "")
+            owner = request.get("owner", "")
+            language = request.get("language", "en")
+            
+            # Try multiple possible cache paths
+            from deepwiki.data.repo_manager import _default_repo_cache_dir
+            cache_dir = _default_repo_cache_dir() / "wiki_cache"
+            
+            # Strategy 1: Direct path from owner/repo
+            if owner and repo:
+                cache_path = _get_cache_path(f"{owner}/{repo}", language)
+                if cache_path.exists():
+                    cache_path.unlink()
+                    return {"status": "success", "message": "Project deleted"}
+            
+            # Strategy 2: Search by repo name in filename
+            if cache_dir.exists():
+                for cache_file in cache_dir.glob(f"*{repo}*{language}.json"):
+                    cache_file.unlink()
+                    return {"status": "success", "message": "Project deleted"}
+            
+            return {"status": "success", "message": "Project not found, nothing to delete"}
         except Exception as exc:
             return {"status": "error", "message": str(exc)}
 
@@ -278,7 +409,11 @@ def create_app(cors_origins: list[str] | None = None) -> FastAPI:
     def local_repo_structure(path: str) -> dict[str, object]:  # pragma: no cover
         print(f"Fetching structure for local path: {path}")
         try:
-            repo_path = Path(path).expanduser().resolve()
+            # Strip local:// prefix if present
+            clean_path = path
+            if clean_path.startswith("local://"):
+                clean_path = clean_path[8:]
+            repo_path = Path(clean_path).expanduser().resolve()
             if not repo_path.exists() or not repo_path.is_dir():
                 return {"status": "error", "message": f"Directory not found: {path}"}
             

@@ -94,6 +94,10 @@ def _git_clone(repo: str, target_dir: Path, token: str | None, repo_type: str | 
 
 
 def resolve_repo_path(repo: str, token: str | None = None, repo_type: str | None = None) -> Path:
+    # Handle local:// prefix used by the UI
+    if repo.startswith("local://"):
+        repo = repo[8:]
+
     if _is_remote_repo(repo):
         target_dir = _target_clone_dir(repo)
         if (target_dir / ".git").exists():

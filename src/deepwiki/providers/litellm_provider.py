@@ -20,10 +20,45 @@ class LiteLLMProvider(BaseLLMProvider):  # pragma: no cover
 
     async def complete(self, request: CompletionRequest) -> CompletionResponse:
         from litellm import acompletion
+        import os
+        import json
 
         kwargs = {}
+        
+        # Try to read OpenClaw config for API keys
+        openclaw_models_path = os.path.expanduser("~/.openclaw/agents/main/agent/models.json")
+        openclaw_api_key = None
+        openclaw_base_url = None
+        if os.path.exists(openclaw_models_path):
+            try:
+                with open(openclaw_models_path) as f:
+                    data = json.load(f)
+                providers = data.get("providers", {})
+                for provider_name in [request.provider, "kimi-coding", "kimi"]:
+                    if provider_name in providers:
+                        provider_cfg = providers[provider_name]
+                        openclaw_api_key = provider_cfg.get("apiKey")
+                        openclaw_base_url = provider_cfg.get("baseUrl")
+                        break
+            except Exception:
+                pass
+        
         if request.provider == "ollama":
-            kwargs["api_base"] = "http://localhost:11434"
+            kwargs["api_base"] = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+        elif request.provider == "kimi" or request.provider == "kimi-coding":
+            # Support kimi-coding API (anthropic-compatible)
+            kwargs["api_base"] = openclaw_base_url or os.environ.get("KIMI_API_BASE", "https://api.kimi.com/coding")
+            api_key = openclaw_api_key or os.environ.get("KIMI_API_KEY")
+            if api_key:
+                kwargs["api_key"] = api_key
+            # Use anthropic as the actual provider for litellm
+            request.provider = "anthropic"
+            if "/" not in request.model:
+                request.model = f"anthropic/{request.model}"
+        elif request.provider == "moonshot":
+            kwargs["api_base"] = os.environ.get("MOONSHOT_API_BASE", "https://api.moonshot.cn/v1")
+            if os.environ.get("MOONSHOT_API_KEY"):
+                kwargs["api_key"] = os.environ["MOONSHOT_API_KEY"]
 
         response = await acompletion(
             model=self._resolve_model(request.provider, request.model),
@@ -37,10 +72,45 @@ class LiteLLMProvider(BaseLLMProvider):  # pragma: no cover
     async def stream(self, request: CompletionRequest) -> AsyncIterator[str]:
         from litellm import acompletion
         import os
+        import sys
+        import json
 
         kwargs = {}
+        
+        # Try to read OpenClaw config for API keys
+        openclaw_models_path = os.path.expanduser("~/.openclaw/agents/main/agent/models.json")
+        openclaw_api_key = None
+        openclaw_base_url = None
+        if os.path.exists(openclaw_models_path):
+            try:
+                with open(openclaw_models_path) as f:
+                    data = json.load(f)
+                providers = data.get("providers", {})
+                for provider_name in [request.provider, "kimi-coding", "kimi"]:
+                    if provider_name in providers:
+                        provider_cfg = providers[provider_name]
+                        openclaw_api_key = provider_cfg.get("apiKey")
+                        openclaw_base_url = provider_cfg.get("baseUrl")
+                        break
+            except Exception:
+                pass
+        
         if request.provider == "ollama":
             kwargs["api_base"] = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+        elif request.provider == "kimi" or request.provider == "kimi-coding":
+            # Support kimi-coding API (anthropic-compatible)
+            kwargs["api_base"] = openclaw_base_url or os.environ.get("KIMI_API_BASE", "https://api.kimi.com/coding")
+            api_key = openclaw_api_key or os.environ.get("KIMI_API_KEY")
+            if api_key:
+                kwargs["api_key"] = api_key
+            # Use anthropic as the actual provider for litellm
+            request.provider = "anthropic"
+            if "/" not in request.model:
+                request.model = f"anthropic/{request.model}"
+        elif request.provider == "moonshot":
+            kwargs["api_base"] = os.environ.get("MOONSHOT_API_BASE", "https://api.moonshot.cn/v1")
+            if os.environ.get("MOONSHOT_API_KEY"):
+                kwargs["api_key"] = os.environ["MOONSHOT_API_KEY"]
 
         stream = await acompletion(
             model=self._resolve_model(request.provider, request.model),
@@ -56,10 +126,44 @@ class LiteLLMProvider(BaseLLMProvider):  # pragma: no cover
     async def embed(self, request: EmbeddingRequest) -> EmbeddingResponse:
         from litellm import aembedding
         import os
+        import json
 
         kwargs = {}
+        
+        # Try to read OpenClaw config for API keys
+        openclaw_models_path = os.path.expanduser("~/.openclaw/agents/main/agent/models.json")
+        openclaw_api_key = None
+        openclaw_base_url = None
+        if os.path.exists(openclaw_models_path):
+            try:
+                with open(openclaw_models_path) as f:
+                    data = json.load(f)
+                providers = data.get("providers", {})
+                for provider_name in [request.provider, "kimi-coding", "kimi"]:
+                    if provider_name in providers:
+                        provider_cfg = providers[provider_name]
+                        openclaw_api_key = provider_cfg.get("apiKey")
+                        openclaw_base_url = provider_cfg.get("baseUrl")
+                        break
+            except Exception:
+                pass
+        
         if request.provider == "ollama":
             kwargs["api_base"] = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+        elif request.provider == "kimi" or request.provider == "kimi-coding":
+            # Support kimi-coding API (anthropic-compatible)
+            kwargs["api_base"] = openclaw_base_url or os.environ.get("KIMI_API_BASE", "https://api.kimi.com/coding")
+            api_key = openclaw_api_key or os.environ.get("KIMI_API_KEY")
+            if api_key:
+                kwargs["api_key"] = api_key
+            # Use anthropic as the actual provider for litellm
+            request.provider = "anthropic"
+            if "/" not in request.model:
+                request.model = f"anthropic/{request.model}"
+        elif request.provider == "moonshot":
+            kwargs["api_base"] = os.environ.get("MOONSHOT_API_BASE", "https://api.moonshot.cn/v1")
+            if os.environ.get("MOONSHOT_API_KEY"):
+                kwargs["api_key"] = os.environ["MOONSHOT_API_KEY"]
 
         try:
             # Try batch embedding first
