@@ -1,0 +1,23 @@
+src/deepwiki/server/api.py
+  17ac77582e8dce64 1-2,4-6,9,13-14,16-17,19-22,25-39,42-44,48-127,132-143,146,152-740,754,764-768,770-772,774,787-793,805,807-811,824,858-868,870-872,879,891-894,933,944
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "a8a963a92fcb7c809dace47c8df99bc506be70ec",
+  "prompts": {
+    "17ac77582e8dce64": {
+      "agent_id": {
+        "tool": "gemini",
+        "id": "02ab0098-4da6-49b3-beea-1baf1a3733cf",
+        "model": "unknown"
+      },
+      "human_author": "litianyi",
+      "messages": [],
+      "total_additions": 853,
+      "total_deletions": 200,
+      "accepted_lines": 948,
+      "overriden_lines": 0
+    }
+  }
+}
