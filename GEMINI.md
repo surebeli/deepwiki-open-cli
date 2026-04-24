@@ -22,6 +22,14 @@ DeepWiki CLI is an AI-powered wiki generator and code Q&A tool for git repositor
 
 ## Getting Started
 
+### Full Stack Deployment & LLM Integration (CRITICAL FOR AGENTS)
+The DeepWiki system consists of two parts that MUST run together for the web interface to work.
+1. **Backend (FastAPI)**: Run `deepwiki serve` (or `python -m uvicorn deepwiki.server.api:create_app --factory --host 0.0.0.0 --port 8001`).
+2. **Frontend (Next.js)**: Navigate to `vendor/deepwiki-open/` and run `npm run dev` (runs on port 3000).
+3. **LLM Connection (Ollama)**: You MUST set the `OLLAMA_HOST` environment variable for the backend to connect to local models (e.g., `export OLLAMA_HOST=http://127.0.0.1:11434`). If running Ollama in Linux/WSL or Docker, ensure Ollama is bound to `0.0.0.0` (not just localhost).
+
+**👉 CRITICAL READ:** For the exact API routing paths, proxy configurations, Context Injection prompts, and Linux deployment constraints, you MUST read `docs/architecture/PROTOCOL_AND_LLM_INTERACTION.md`.
+
 ### Installation
 ```bash
 # Install dependencies (using uv or pip)
