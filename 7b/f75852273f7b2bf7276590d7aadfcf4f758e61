@@ -1,0 +1,25 @@
+GEMINI.md
+  17ac77582e8dce64 25-32
+README.md
+  17ac77582e8dce64 36-37,43,49-68
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "7bf75852273f7b2bf7276590d7aadfcf4f758e61",
+  "prompts": {
+    "17ac77582e8dce64": {
+      "agent_id": {
+        "tool": "gemini",
+        "id": "02ab0098-4da6-49b3-beea-1baf1a3733cf",
+        "model": "unknown"
+      },
+      "human_author": "litianyi",
+      "messages": [],
+      "total_additions": 32,
+      "total_deletions": 0,
+      "accepted_lines": 99,
+      "overriden_lines": 0
+    }
+  }
+}
