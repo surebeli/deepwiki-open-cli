@@ -72,4 +72,8 @@ pip install -e .
 - **JSON Mode**: When `--json` is used, all progress info should go to `stderr`, and the final structured result to `stdout`.
 - **Path Handling**: Always use `pathlib.Path` for cross-platform compatibility.
 - **Error Handling**: Follow the exit code contract (0: Success, 2: Config, 3: Repo, 4: LLM, 5: Embedding).
-- **Security**: Never log or print full API keys; use masking (e.g., `sk-***XXXX`).
+- **Security & Credential Management (12-Factor App)**: 
+  - NEVER hardcode sensitive data (API keys like `sk-***`, tokens like `ghp_***`, passwords) in the codebase.
+  - All credentials and sensitive settings (like `OPENAI_API_KEY`, `OLLAMA_HOST`, `WIKI_AUTH_CODE`) MUST be managed via environment variables (`os.environ.get(...)`).
+  - NEVER commit `.env`, `.env.local`, or any file containing real credentials to the Git repository. Ensure these are covered by `.gitignore`.
+  - When logging or printing errors, always mask full API keys (e.g., `sk-***XXXX`).

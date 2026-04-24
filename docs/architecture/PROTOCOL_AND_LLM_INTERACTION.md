@@ -113,7 +113,15 @@ OPENAI_API_KEY=sk-...
 ANTHROPIC_API_KEY=sk-...
 ```
 
-### 3.3 Reliability & Fallbacks
+### 3.3 Security & Credential Management (12-Factor App)
+
+To ensure robust security during deployment:
+- **No Hardcoded Keys**: NEVER hardcode API keys (e.g., `sk-...`), GitHub tokens (`ghp_...`), or authorization codes in the source code.
+- **Environment Variables**: All credentials and sensitive settings (like `OPENAI_API_KEY`, `OLLAMA_HOST`, `WIKI_AUTH_CODE`) MUST be managed via environment variables (`os.environ.get(...)`).
+- **File Exclusions**: NEVER commit `.env`, `.env.local`, or any file containing real credentials to the Git repository. Ensure these files are strictly ignored via `.gitignore`.
+- **Log Masking**: When logging or printing errors, always mask full API keys (e.g., `sk-***XXXX`) to prevent leakage into production logs.
+
+### 3.4 Reliability & Fallbacks
 
 - **File Path Resolution**: The backend intercepts `local://` paths (used by the frontend) and actively attempts to resolve them against `Path.cwd()`, `Path.cwd().parent`, or absolute system paths. In Linux, ensure the backend process has read permissions (`chmod +r`) for the target codebase directories.
 - **LLM Refusals**: The backend implements a robust interception layer. If an LLM stream detects refusal phrases (e.g., `"as an ai"`, `"cannot"`) in the first 20 characters of generating a Wiki structure, the backend immediately halts the stream and yields a hardcoded, structural XML fallback to prevent the frontend from collapsing.
